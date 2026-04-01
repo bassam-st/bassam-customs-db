@@ -1,8 +1,10 @@
-name: Deploy prebuilt app to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'artifacts/customs-db/dist/public/**'
   workflow_dispatch:
 
 permissions:
@@ -20,15 +22,11 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload prebuilt artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: artifacts/customs-db/dist/public
