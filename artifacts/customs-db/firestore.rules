@@ -1,0 +1,91 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // دوال المساعدة
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActive() {
+      return getUserData().status == 'active';
+    }
+
+    function isOwner() {
+      return getUserData().role == 'owner';
+    }
+
+    function isEmployee() {
+      let role = getUserData().role;
+      return role == 'employee' || role == 'owner';
+    }
+
+    function isActiveEmployee() {
+      return isSignedIn() && isActive() && isEmployee();
+    }
+
+    function isActiveOwner() {
+      return isSignedIn() && isActive() && isOwner();
+    }
+
+    // بيانات التهيئة العامة - مقروءة للجميع، تُكتب مرة واحدة فقط عند التسجيل الأول
+    match /app_meta/{doc} {
+      allow read: if true;
+      allow create: if !exists(/databases/$(database)/documents/app_meta/$(doc));
+      allow update: if isActiveOwner();
+      allow delete: if false;
+    }
+
+    // إعدادات التطبيق - القراءة للجميع المسجلين، الكتابة للمالك فقط
+    match /app_settings/{doc} {
+      allow read: if isSignedIn() && isActive();
+      allow write: if isActiveOwner();
+    }
+
+    // البنود الجمركية - القراءة للجميع، الإضافة/التعديل للموظفين، الحذف للمالك
+    match /items/{itemId} {
+      allow read: if isSignedIn() && isActive();
+      allow create, update: if isActiveEmployee();
+      allow delete: if isActiveOwner();
+    }
+
+    // العمليات - الموظفون يمكنهم إنشاء وتعديل، المشاهد يرى فقط
+    match /operations/{opId} {
+      allow read: if isSignedIn() && isActive();
+      allow create, update: if isActiveEmployee();
+      allow delete: if isActiveOwner();
+
+      // سطور العمليات
+      match /lines/{lineId} {
+        allow read: if isSignedIn() && isActive();
+        allow write: if isActiveEmployee();
+      }
+    }
+
+    // بيانات المستخدمين - المستخدم يرى بياناته، المالك يرى الكل
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isActiveOwner());
+      allow create: if isActiveOwner();
+      allow update: if isSignedIn() && (request.auth.uid == uid || isActiveOwner());
+      allow delete: if isActiveOwner();
+    }
+
+    // سجلات المراجعة - الإنشاء للموظفين، القراءة للمالك فقط
+    match /audit_logs/{logId} {
+      allow read: if isActiveOwner();
+      allow create: if isActiveEmployee();
+      allow update, delete: if false; // لا تعديل ولا حذف للسجلات
+    }
+
+    // بيانات النسخ الاحتياطية
+    match /backups_meta/{backupId} {
+      allow read: if isActiveOwner();
+      allow write: if isActiveOwner();
+    }
+  }
+}
