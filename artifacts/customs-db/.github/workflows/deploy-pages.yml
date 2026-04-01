@@ -17,6 +17,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,15 +25,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
+          node-version: "20"
 
       - name: Install dependencies
-        run: pnpm install
+        run: npm install
 
       - name: Build
         env:
@@ -42,11 +38,9 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          # اسم مستودع GitHub للمسار الأساسي
-          # إذا كان المستودع bassam-customs-db، قيّم BASE_PATH=/bassam-customs-db/
+          OWNER_INITIAL_PIN: ${{ secrets.OWNER_INITIAL_PIN }}
           BASE_PATH: /bassam-customs-db/
-          PORT: 4173
-        run: pnpm run build
+        run: npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -54,7 +48,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'dist/public'
+          path: dist
 
   deploy:
     environment:
@@ -62,6 +56,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
