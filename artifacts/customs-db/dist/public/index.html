@@ -10,15 +10,115 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="الجمارك" />
     <title>مخزن البنود الجمركية</title>
+
     <link rel="icon" type="image/svg+xml" href="/bassam-customs-db/favicon.svg" />
     <link rel="manifest" href="/bassam-customs-db/manifest.json" />
+    <link rel="apple-touch-icon" href="/bassam-customs-db/favicon.svg" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     <script type="module" crossorigin src="/bassam-customs-db/assets/index-Behk3MBo.js"></script>
     <link rel="stylesheet" crossorigin href="/bassam-customs-db/assets/index-GaMIzTPr.css">
+
+    <style>
+      #install-app-btn,
+      #ios-install-tip {
+        position: fixed;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        z-index: 99999;
+        border: 0;
+        border-radius: 16px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+        font-family: "Cairo", sans-serif;
+      }
+
+      #install-app-btn {
+        display: none;
+        background: #2563eb;
+        color: #fff;
+        padding: 14px 16px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      #ios-install-tip {
+        display: none;
+        background: #ffffff;
+        color: #111827;
+        padding: 14px 16px;
+        font-size: 14px;
+        line-height: 1.8;
+        border: 1px solid #e5e7eb;
+      }
+
+      #ios-install-tip strong {
+        color: #2563eb;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <button id="install-app-btn" type="button">تثبيت التطبيق</button>
+
+    <div id="ios-install-tip">
+      لتثبيت التطبيق على iPhone:
+      افتح <strong>مشاركة</strong> ثم اختر
+      <strong>Add to Home Screen</strong>
+    </div>
+
+    <script>
+      (function () {
+        const BASE_PATH = "/bassam-customs-db/";
+        const installBtn = document.getElementById("install-app-btn");
+        const iosTip = document.getElementById("ios-install-tip");
+
+        let deferredPrompt = null;
+
+        const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+        const isStandalone =
+          window.matchMedia("(display-mode: standalone)").matches ||
+          window.navigator.standalone === true;
+
+        if ("serviceWorker" in navigator) {
+          window.addEventListener("load", function () {
+            navigator.serviceWorker
+              .register(BASE_PATH + "sw.js")
+              .catch(function () {});
+          });
+        }
+
+        if (!isStandalone && isIos) {
+          iosTip.style.display = "block";
+        }
+
+        window.addEventListener("beforeinstallprompt", function (e) {
+          e.preventDefault();
+          deferredPrompt = e;
+          iosTip.style.display = "none";
+          installBtn.style.display = "block";
+        });
+
+        installBtn.addEventListener("click", async function () {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          try {
+            await deferredPrompt.userChoice;
+          } catch (e) {}
+          deferredPrompt = null;
+          installBtn.style.display = "none";
+        });
+
+        window.addEventListener("appinstalled", function () {
+          installBtn.style.display = "none";
+          iosTip.style.display = "none";
+        });
+      })();
+    </script>
   </body>
 </html>
