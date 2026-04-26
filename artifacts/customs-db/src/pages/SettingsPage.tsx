@@ -3,12 +3,14 @@
  */
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
-import { Settings, Save, LogOut, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Settings, Save, LogOut, AlertCircle, AlertTriangle, Download } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
 import { PageHeader } from '../components/Layout';
 import { PinDialog } from '../components/PinDialog';
 import { useAuth } from '../app/AuthContext';
 import { useSettings } from '../app/SettingsContext';
 import { saveSettings } from '../lib/firestore';
+import { db } from '../lib/firebase';
 import { hashPin } from '../lib/pinHash';
 import { signOut } from '../lib/auth';
 import { isOwner } from '../lib/permissions';
@@ -54,7 +56,10 @@ export default function SettingsPage() {
       setError('كلمتا PIN غير متطابقتين');
       return;
     }
-    if (form.exchangeRate <= 0) { setError('سعر الصرف يجب أن يكون أكبر من صفر'); return; }
+    if (form.exchangeRate <= 0) {
+      setError('سعر الصرف يجب أن يكون أكبر من صفر');
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -86,6 +91,64 @@ export default function SettingsPage() {
     navigate('/login');
   };
 
+  const handleBackup = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const readCollection = async (name: string) => {
+        const snap = await getDocs(collection(db, name));
+        return snap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      };
+
+      const [items, operations, users, appSettings, appMeta] = await Promise.all([
+        readCollection('items'),
+        readCollection('operations'),
+        readCollection('users'),
+        readCollection('app_settings'),
+        readCollection('app_meta'),
+      ]);
+
+      const backup = {
+        backupVersion: 1,
+        backupDate: new Date().toISOString(),
+        appName: form.appName,
+        settings,
+        collections: {
+          items,
+          operations,
+          users,
+          app_settings: appSettings,
+          app_meta: appMeta,
+        },
+      };
+
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: 'application/json;charset=utf-8',
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bassam-customs-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setSuccess('تم تنزيل النسخة الاحتياطية بنجاح');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError('فشل تنزيل النسخة الاحتياطية');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (showPinDialog && !pinVerified) {
     return (
       <PinDialog
@@ -101,7 +164,6 @@ export default function SettingsPage() {
 
       <div className="p-4 flex flex-col gap-4 pb-8">
 
-        {/* تحذير: PIN غير مضبوط */}
         {(!settings.ownerPinHash || settings.ownerPinHash.trim() === '') && (
           <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-3">
             <AlertTriangle size={18} className="text-yellow-600 mt-0.5 shrink-0" />
@@ -111,7 +173,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* الإعدادات العامة */}
         <Section title="الإعدادات العامة">
           <Field label="اسم التطبيق">
             <input
@@ -134,7 +195,6 @@ export default function SettingsPage() {
           </Field>
         </Section>
 
-        {/* عوامل الفئات */}
         <Section title="عوامل الفئات الجمركية">
           <Field label="عامل 5%">
             <input
@@ -168,7 +228,6 @@ export default function SettingsPage() {
           </Field>
         </Section>
 
-        {/* تغيير PIN */}
         <Section title="تغيير PIN المالك">
           <p className="text-xs text-muted-foreground">اتركه فارغاً إذا لم تريد تغيير PIN</p>
           <Field label="PIN الجديد">
@@ -203,6 +262,15 @@ export default function SettingsPage() {
         )}
 
         <button
+          onClick={handleBackup}
+          disabled={saving}
+          className="w-full py-4 rounded-2xl bg-green-600 text-white font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          <Download size={20} />
+          {saving ? 'جاري تجهيز النسخة...' : 'تحميل نسخة احتياطية'}
+        </button>
+
+        <button
           onClick={handleSave}
           disabled={saving}
           className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
@@ -211,7 +279,6 @@ export default function SettingsPage() {
           {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
         </button>
 
-        {/* تسجيل الخروج */}
         <button
           onClick={handleLogout}
           className="w-full py-3.5 rounded-2xl border border-destructive/30 text-destructive font-medium text-sm flex items-center justify-center gap-2"
@@ -219,7 +286,6 @@ export default function SettingsPage() {
           <LogOut size={18} /> تسجيل الخروج
         </button>
 
-        {/* معلومات المستخدم */}
         {appUser && (
           <div className="bg-muted/50 rounded-2xl p-4 text-sm text-muted-foreground text-center">
             <p>مسجل دخول كـ: {appUser.fullName}</p>
